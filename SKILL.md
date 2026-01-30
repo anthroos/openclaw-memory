@@ -1,135 +1,199 @@
 ---
 name: memory-manager
-description: CRITICAL - Load this skill BEFORE spawning subagents or when context feels heavy. Prevents context overflow by tracking token usage and compressing old messages. If you see 'Context overflow' errors - you MUST use this skill immediately.
-metadata: {"clawdbot":{"emoji":"🧠","os":["darwin","linux"],"requires":{"bins":["python3"]},"priority":"high","autoLoad":true}}
+description: 🚨 MANDATORY SKILL - LOAD ON EVERY SESSION! Prevents context overflow. You MUST follow the STRICT PROTOCOL below for EVERY tool call. Failure = context overflow = crash.
+metadata: {"clawdbot":{"emoji":"🧠","os":["darwin","linux"],"requires":{"bins":["python3"]},"priority":"critical","autoLoad":true}}
 ---
 
-# Memory Manager
+# 🚨 MEMORY MANAGER - STRICT PROTOCOL
 
-**⚠️ CRITICAL: Use this skill BEFORE spawning any subagents!**
+## ⛔ STOP! READ BEFORE ANY ACTION!
 
-Prevents context overflow by monitoring token usage and compressing old messages before hitting limits.
+**This protocol is MANDATORY for EVERY tool call, EVERY response, EVERY session.**
 
-## MANDATORY RULES (READ FIRST!)
+---
 
-1. **BEFORE spawning subagents**: Check context size first!
-2. **If context > 70%**: Do NOT spawn agents. Compress first.
-3. **If you see "Context overflow"**: STOP. Start new session or compress.
-4. **Maximum subagents**: Spawn max 2 at a time, never more!
-5. **Subagent context**: Pass ONLY the task description, NOT full history!
+## 🔴 THE GOLDEN RULES (MEMORIZE!)
 
-## Quick Check (Run This First!)
+### Rule 1: NEVER use native tools for external data
+```
+❌ BANNED: web_fetch, curl, wget
+✅ USE: python3 {baseDir}/scripts/smart_fetch.py --url URL --context-percent X
 
-```bash
-# Check if safe to spawn agents
-python3 {baseDir}/scripts/token_counter.py --text "$(cat current_context.txt)" --threshold 0.6
+❌ BANNED: cat large_file, read entire files
+✅ USE: python3 {baseDir}/scripts/smart_read.py --file FILE --context-percent X
 ```
 
-If exit code = 1 → **DO NOT SPAWN AGENTS!** Compress first.
+### Rule 2: EVERY 3 tool calls → CHECK CONTEXT
+```bash
+# After every 3 tool calls, run this:
+echo "Context check" && python3 {baseDir}/scripts/token_counter.py --text "current estimate"
+```
 
-## Problem Solved
+### Rule 3: If context > 50% → SWITCH TO SURVIVAL MODE
+- Use `--signatures-only` for code files
+- Use `--force-summary` for all fetches
+- Keep responses under 500 tokens
+- NO explanations, just facts
 
-- Context window fills up unexpectedly → crash
-- No visibility into token usage or costs  
-- Spawned agents inherit full context → instant overflow
+### Rule 4: If context > 70% → EMERGENCY STOP
+```
+🚨 STOP ALL OPERATIONS!
+Tell user: "Контекст переповнений (>70%). Потрібно /new session."
+DO NOT continue!
+```
 
-## Files
+### Rule 5: MAX 2 subagents, MINIMAL context
+```
+❌ spawn(full_conversation_history)
+✅ spawn(only_task_description_under_500_tokens)
+```
 
-- `{baseDir}/scripts/token_counter.py` — count tokens in text
-- `{baseDir}/scripts/compressor.py` — summarize old messages
-- `{baseDir}/scripts/budget_tracker.py` — track costs + alerts
-- `{baseDir}/scripts/dashboard_server.py` — serve monitoring dashboard
-- `{baseDir}/dashboard/index.html` — visual dashboard
+---
 
-## Install dependencies
+## 📋 PRE-ACTION CHECKLIST (Run mentally before EVERY action)
+
+```
+□ Is this tool call necessary?
+□ Can I get the same info with less tokens?
+□ Am I using smart_fetch/smart_read instead of native?
+□ Have I checked context recently?
+□ Is my response concise (not verbose)?
+```
+
+---
+
+## 🛠️ TOOLS REFERENCE
+
+### CHECK CONTEXT (do this often!)
+```bash
+python3 {baseDir}/scripts/token_counter.py --text "your text"
+# Returns: {"tokens": X, "percent": Y, "warning": "OK/MEDIUM/HIGH/CRITICAL"}
+```
+
+### SMART FETCH (URLs) - ALWAYS USE THIS!
+```bash
+python3 {baseDir}/scripts/smart_fetch.py \
+  --url "https://example.com" \
+  --context-percent 0.5
+```
+
+### SMART READ (Files) - ALWAYS USE THIS!
+```bash
+# For code - signatures only
+python3 {baseDir}/scripts/smart_read.py --file code.py --signatures-only
+
+# For any file with context awareness
+python3 {baseDir}/scripts/smart_read.py --file doc.md --context-percent 0.6
+```
+
+### GET CACHED FULL CONTENT (if needed)
+```bash
+python3 {baseDir}/scripts/cache_manager.py --get CACHE_ID
+python3 {baseDir}/scripts/cache_manager.py --get CACHE_ID --section "specific part"
+```
+
+### COMPRESS HISTORY (emergency)
+```bash
+python3 {baseDir}/scripts/compressor.py --input history.json --keep-recent 5
+```
+
+---
+
+## 📊 CONTEXT BUDGET TABLE
+
+| Your Context | Tool Output Budget | Response Length | Mode |
+|--------------|-------------------|-----------------|------|
+| < 40% | 10K tokens | Normal | Relaxed |
+| 40-50% | 5K tokens | Concise | Careful |
+| 50-70% | 2K tokens | Minimal | Survival |
+| > 70% | 500 tokens | Emergency | STOP! |
+
+---
+
+## ⚡ QUICK DECISION TREE
+
+```
+Need external data?
+├── URL → smart_fetch.py (NOT web_fetch!)
+├── File → smart_read.py (NOT cat/read!)
+└── API → smart_fetch.py with API URL
+
+Context feeling heavy?
+├── < 50% → Continue carefully
+├── 50-70% → Switch to survival mode
+└── > 70% → STOP, tell user to /new
+
+Spawning subagent?
+├── Context > 50%? → NO, don't spawn
+├── Task description > 500 tokens? → Shorten it
+└── More than 2 agents? → NO, max 2
+```
+
+---
+
+## 🚫 BANNED PATTERNS
+
+```
+❌ "Let me fetch this URL..." → web_fetch → 50K tokens → OVERFLOW
+❌ "I'll read the entire file..." → cat → 30K tokens → OVERFLOW
+❌ "Here's a detailed explanation..." → 5K response → OVERFLOW
+❌ "Spawning 5 expert agents..." → 5x context → OVERFLOW
+
+✅ "Using smart_fetch..." → 2K summary → SAFE
+✅ "Reading signatures only..." → 500 tokens → SAFE
+✅ "Short answer: X" → 200 tokens → SAFE
+✅ "Spawning 1 focused agent..." → minimal context → SAFE
+```
+
+---
+
+## 💀 WHAT HAPPENS IF YOU IGNORE THIS
+
+```
+1. You use native web_fetch
+2. Returns 50K tokens
+3. Context jumps from 60% to 95%
+4. Your next response triggers overflow
+5. "Context overflow: prompt too large"
+6. Session dies, state lost
+7. User angry, has to start over
+```
+
+**DON'T BE THAT AGENT. FOLLOW THE PROTOCOL.**
+
+---
+
+## 📁 Files in this skill
+
+### v1.0 - Compress OLD
+- `{baseDir}/scripts/token_counter.py` — count tokens
+- `{baseDir}/scripts/compressor.py` — compress history
+- `{baseDir}/scripts/budget_tracker.py` — track costs
+
+### v2.0 - Optimize INCOMING
+- `{baseDir}/scripts/smart_fetch.py` — URL fetch + auto-summary
+- `{baseDir}/scripts/smart_read.py` — file read + auto-summary
+- `{baseDir}/scripts/cache_manager.py` — temp storage
+
+---
+
+## 🔧 Install
 
 ```bash
 python3 -m pip install -r {baseDir}/requirements.txt
 ```
 
-## Usage
+---
 
-### Count tokens in text
+## 📝 Session Start Checklist
 
-```bash
-python3 {baseDir}/scripts/token_counter.py --text "Your message here"
-python3 {baseDir}/scripts/token_counter.py --file conversation.json
-```
+When starting any session:
+1. ✅ Load this skill
+2. ✅ Remember: smart_fetch > web_fetch
+3. ✅ Remember: smart_read > cat/read
+4. ✅ Remember: check context every 3 tools
+5. ✅ Remember: > 70% = STOP
 
-Output:
-```json
-{"tokens": 1234, "limit": 200000, "percent": 0.6, "remaining": 198766}
-```
+---
 
-### Check if compression needed
-
-```bash
-python3 {baseDir}/scripts/token_counter.py --file history.json --threshold 0.7
-```
-
-Returns exit code 1 if above threshold (needs compression).
-
-### Compress conversation history
-
-```bash
-python3 {baseDir}/scripts/compressor.py --input history.json --output compressed.json
-python3 {baseDir}/scripts/compressor.py --input history.json --keep-recent 5
-```
-
-Keeps last N messages verbatim, summarizes older messages.
-
-### Track costs
-
-```bash
-python3 {baseDir}/scripts/budget_tracker.py --state state.json
-python3 {baseDir}/scripts/budget_tracker.py --state state.json --alert-at 5.00
-```
-
-Output:
-```json
-{"session_cost": 2.45, "daily_cost": 12.30, "alert": false, "breakdown": {...}}
-```
-
-### Launch dashboard
-
-```bash
-python3 {baseDir}/scripts/dashboard_server.py --port 8765 --state state.json
-```
-
-Open http://localhost:8765 to view real-time metrics.
-
-## Recommended workflow
-
-Before spawning agents:
-
-```bash
-# 1. Check current usage
-python3 {baseDir}/scripts/token_counter.py --file history.json --threshold 0.7
-
-# 2. If above threshold, compress first
-python3 {baseDir}/scripts/compressor.py --input history.json --output history.json --keep-recent 5
-
-# 3. Now safe to spawn agents with smaller context
-```
-
-## Compression thresholds
-
-- **70%** (140K tokens): Warning, consider compressing
-- **80%** (160K tokens): Compress now
-- **90%** (180K tokens): Critical, immediate compression
-
-## Model pricing (for cost tracking)
-
-| Model | Input (per 1M) | Output (per 1M) |
-|-------|----------------|-----------------|
-| claude-3-opus | $15.00 | $75.00 |
-| claude-3-sonnet | $3.00 | $15.00 |
-| claude-3-haiku | $0.25 | $1.25 |
-| claude-3.5-sonnet | $3.00 | $15.00 |
-
-## Notes
-
-- Token counting uses `tiktoken` with `cl100k_base` encoding (Claude-compatible)
-- Compression uses Claude Haiku (cheapest) for summarization
-- State persisted in JSON files for recovery
-- Dashboard polls every 2 seconds for real-time updates
+**Created to prevent context overflow. Follow strictly. No exceptions.**

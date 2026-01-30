@@ -1,0 +1,34 @@
+{
+  "9e404ff6e906": {
+    "file": "/Users/ivanpasichnyk/.clawdbot/skills/memory-manager/cache/9e404ff6e906.txt",
+    "source": "scripts/smart_fetch.py",
+    "created": "2026-01-31T02:48:09.067934",
+    "expires": "2026-01-31T04:48:09.067755",
+    "size_bytes": 8145,
+    "tokens_estimated": 2036
+  },
+  "6804c0ba851c": {
+    "file": "/Users/ivanpasichnyk/.clawdbot/skills/memory-manager/cache/6804c0ba851c.txt",
+    "source": "https://github.com/anthroos/openclaw-memory",
+    "created": "2026-01-31T02:50:21.503287",
+    "expires": "2026-01-31T04:50:21.503113",
+    "size_bytes": 100031,
+    "tokens_estimated": 25007
+  },
+  "faef45fc2cf7": {
+    "file": "/Users/ivanpasichnyk/.clawdbot/skills/memory-manager/cache/faef45fc2cf7.txt",
+    "source": "/Users/ivanpasichnyk/.clawdbot/skills/memory-manager/scripts/smart_fetch.py",
+    "created": "2026-01-31T02:50:32.900219",
+    "expires": "2026-01-31T04:50:32.900027",
+    "size_bytes": 8145,
+    "tokens_estimated": 2036
+  },
+  "997d7cbebf60": {
+    "file": "/Users/ivanpasichnyk/.clawdbot/skills/memory-manager/cache/997d7cbebf60.txt",
+    "source": "https://docs.python.org",
+    "created": "2026-01-31T02:50:59.401488",
+    "expires": "2026-01-31T04:50:59.401303",
+    "size_bytes": 17802,
+    "tokens_estimated": 4449
+  }
+}
