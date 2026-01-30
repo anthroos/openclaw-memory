@@ -1,168 +1,180 @@
-# OpenClaw Memory Manager
+# OpenClaw Memory Manager v2.0
 
-**Real-time context monitoring with streaming compression for AI agents.**
+**Smart Tool Proxy for AI agents. Prevents "context overflow" by auto-summarizing large inputs.**
 
-Prevents context overflow (the dreaded "prompt too large" error) by tracking token usage, compressing old messages proactively, and providing cost estimates.
+## The Problem
 
-## Before: The Problem
-
-Without memory management, AI agents hit context limits unexpectedly:
-
-```mermaid
-flowchart TD
-    subgraph before [WITHOUT Memory Manager]
-        A1[User message] --> B1[Agent responds]
-        B1 --> C1[Context grows]
-        C1 --> D1[More messages...]
-        D1 --> E1[200K tokens reached]
-        E1 --> F1[Context overflow]
-        F1 --> G1[Agent crashes]
-        G1 --> H1[State lost forever]
-    end
-    
-    style F1 fill:#ff4466,color:#fff
-    style G1 fill:#ff4466,color:#fff
-    style H1 fill:#ff4466,color:#fff
-```
-
-**Real example:** Lucy tried to spawn 3 expert agents to discuss a problem. All 3 crashed with "Context overflow: prompt too large" — while discussing how to solve context overflow. The irony!
-
-## After: The Solution
-
-With Memory Manager, context is monitored and compressed proactively:
-
-```mermaid
-flowchart TD
-    subgraph after [WITH Memory Manager]
-        A2[User message] --> B2[Check tokens]
-        B2 --> C2{Above 70%?}
-        C2 -->|No| D2[Agent responds]
-        C2 -->|Yes| E2[Compress old messages]
-        E2 --> F2[Summary + recent msgs]
-        F2 --> D2
-        D2 --> G2[Log cost]
-        G2 --> H2[Update dashboard]
-        H2 --> A2
-    end
-    
-    style E2 fill:#00ff88,color:#000
-    style F2 fill:#00ff88,color:#000
-```
-
-**Compression in action:**
+AI agents have a context limit (~200K tokens). One `web_fetch` can return 50K tokens. Three fetches = crash.
 
 ```
-BEFORE: [msg1][msg2][msg3][msg4][msg5][msg6][msg7][msg8][msg9][msg10]
-              ↑_________old (7 msgs)________↑  ↑__recent (3)__↑
-                      128 tokens                   89 tokens
-                      
-AFTER:  [SUMMARY: discussed Paris, history,  ][msg8][msg9][msg10]
-         landmarks, restaurants, best time    
-                   ~30 tokens                      89 tokens
-
-SAVED: 98 tokens (76% compression ratio)
+┌─────────────────────────────────────────────────────────────┐
+│                    CONTEXT WINDOW (200K)                    │
+├─────────────────────────────────────────────────────────────┤
+│ System prompt    │████░░░░░░░░░░░░░░░░░░░░░░░░░░│  5K      │
+│ Conversation     │████████░░░░░░░░░░░░░░░░░░░░░░│  20K     │
+│ web_fetch #1     │████████████████░░░░░░░░░░░░░░│ +50K 💥  │
+│ web_fetch #2     │████████████████████████░░░░░░│ +40K 💥  │
+│ web_fetch #3     │████████████████████████████░░│ +35K 💥  │
+│ Next response    │██████████████████████████████│ OVERFLOW │
+└─────────────────────────────────────────────────────────────┘
+                              ↓
+              "Context overflow: prompt too large"
+                        SESSION DEAD
 ```
 
-## Architecture
+**What happens:**
+1. Agent calls `web_fetch` → gets 50K tokens
+2. All content goes into context window
+3. After 3 requests → overflow, session dead
+4. Work lost
 
-```mermaid
-flowchart LR
-    subgraph agent [AI Agent]
-        MSG[Messages]
-    end
-    
-    subgraph memmanager [Memory Manager]
-        TC[Token Counter]
-        COMP[Compressor]
-        BT[Budget Tracker]
-    end
-    
-    subgraph storage [State]
-        STATE[state.json]
-        HIST[history.json]
-    end
-    
-    subgraph ui [Monitoring]
-        DASH[Dashboard]
-    end
-    
-    MSG --> TC
-    TC -->|above threshold| COMP
-    COMP -->|uses Haiku| COMP
-    COMP --> HIST
-    TC --> BT
-    BT --> STATE
-    STATE --> DASH
+---
+
+## The Solution
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    CONTEXT WINDOW (200K)                    │
+├─────────────────────────────────────────────────────────────┤
+│ System prompt    │████░░░░░░░░░░░░░░░░░░░░░░░░░░│  5K      │
+│ Conversation     │████████░░░░░░░░░░░░░░░░░░░░░░│  20K     │
+│ smart_fetch #1   │████████▓░░░░░░░░░░░░░░░░░░░░░│ +3K ✅   │
+│ smart_fetch #2   │████████▓▓░░░░░░░░░░░░░░░░░░░░│ +2K ✅   │
+│ smart_fetch #3   │████████▓▓▓░░░░░░░░░░░░░░░░░░░│ +2K ✅   │
+│ ... #10          │████████▓▓▓▓▓▓░░░░░░░░░░░░░░░░│ +15K ✅  │
+│ Still working!   │░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░│ 55% free │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│                    LOCAL CACHE                              │
+├─────────────────────────────────────────────────────────────┤
+│ abc123.txt │ Full content from fetch #1 (50K)              │
+│ def456.txt │ Full content from fetch #2 (40K)              │
+│ ghi789.txt │ Full content from fetch #3 (35K)              │
+│            │ → Access: cache --get ID --section "keyword"   │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## Features
+**What happens now:**
+1. `smart_fetch` gets page (50K)
+2. Auto-summarizes to 2-3K (key info)
+3. Full content → local cache
+4. Only summary goes to context
+5. Need details? → `cache --get ID --section "pricing"`
 
-- **Token Counter** — Real-time tracking of context usage
-- **Streaming Compressor** — Proactive summarization before hitting limits  
-- **Budget Tracker** — Cost estimates and alerts
-- **Dashboard** — Visual monitoring UI
+---
+
+## How It Works
+
+```
+User: "Find info about company X"
+              │
+              ▼
+┌─────────────────────────────────┐
+│ smart_fetch("company-x.com")   │
+│                                 │
+│ 1. Fetch page → 50K tokens     │
+│ 2. Check context: 30%          │
+│ 3. Budget at 30% = 10K         │
+│ 4. Content > budget?           │
+│    YES → summarize to 3K       │
+│         + save full to cache   │
+│ 5. Return: summary + cache_id  │
+└─────────────────────────────────┘
+              │
+              ▼
+Agent receives:
+- Summary (3K) → into context
+- cache_id: "abc123" → if details needed
+
+Context: 30% → 32% (instead of 30% → 55%!)
+```
+
+---
+
+## Comparison
+
+| Metric | Without | With Memory Manager |
+|--------|---------|---------------------|
+| Requests before overflow | 3 | 10-20+ |
+| Tokens per fetch | 50K | 2-5K |
+| Full data | Lost | Cached |
+| Autonomy | Low | High |
+
+---
 
 ## Quick Start
 
-### 1. Install dependencies
+### Install
 
 ```bash
-pip install -r requirements.txt
+pip install tiktoken
 ```
 
-### 2. Count tokens
+### Use smart_fetch instead of web_fetch
+
+```bash
+# Auto-summarizes based on current context usage
+python3 scripts/smart_fetch.py --url "https://example.com" --context-percent 0.3
+```
+
+### Use smart_read instead of cat/read
+
+```bash
+# For code files - extract signatures only
+python3 scripts/smart_read.py --file app.py --signatures-only
+
+# For any file - auto-summarize
+python3 scripts/smart_read.py --file docs.md --context-percent 0.5
+```
+
+### Retrieve full content from cache
+
+```bash
+# Get specific section
+python3 scripts/cache_manager.py --get abc123 --section "pricing"
+
+# Get everything
+python3 scripts/cache_manager.py --get abc123
+```
+
+### Count tokens
 
 ```bash
 python3 scripts/token_counter.py --text "Your message here"
-# {"tokens": 5, "limit": 200000, "percent": 0.0, "warning": "OK"}
+# {"tokens": 5, "percent": 0.0, "warning": "OK"}
 ```
 
-### 3. Check if compression needed
+---
 
-```bash
-python3 scripts/token_counter.py --file history.json --threshold 0.7
-# Exit code 1 if above 70% — time to compress!
-```
+## Context Budget
 
-### 4. Compress conversation
+| Context % | Output Budget | Agent Action |
+|-----------|---------------|--------------|
+| < 40% | 10K tokens | Full speed |
+| 40-70% | 5K tokens | Continue |
+| 70-85% | 2K tokens | Finish current task |
+| > 85% | 500 tokens | Suggest /new session |
 
-```bash
-python3 scripts/compressor.py --input history.json --output compressed.json --keep-recent 5
-```
+---
 
-### 5. Track costs
+## Rules for Agents
 
-```bash
-python3 scripts/budget_tracker.py --log-usage --model claude-3-sonnet --input-tokens 5000 --output-tokens 1500
-python3 scripts/budget_tracker.py --state state.json
-# {"session_cost": 0.04, "daily_cost": 2.45, ...}
-```
+1. **NEVER** use `web_fetch`, `curl`, `cat` → use `smart_fetch` / `smart_read`
+2. **ALWAYS** pass `limit` to API calls: `search(limit=5)`
+3. **CHECK** context every 3 tool calls
+4. **AT 70%+**: finish current task, suggest `/new`
+5. **CACHE**: retrieve details with `--section "keyword"`
 
-### 6. Launch dashboard
-
-```bash
-python3 scripts/dashboard_server.py --port 8765
-# Open http://localhost:8765
-```
-
-## Thresholds
-
-| Usage | Warning | Action |
-|-------|---------|--------|
-| < 70% | OK | Continue |
-| 70-80% | MEDIUM | Consider compressing |
-| 80-90% | HIGH | Compress now |
-| > 90% | CRITICAL | Immediate compression |
+---
 
 ## As a Clawdbot/Moltbot Skill
-
-Copy this folder to your skills directory:
 
 ```bash
 cp -r . ~/.clawdbot/skills/memory-manager/
 ```
 
-Or add to your Clawdbot config:
+Or add to config:
 
 ```json
 {
@@ -174,21 +186,28 @@ Or add to your Clawdbot config:
 }
 ```
 
-The skill follows the standard Clawdbot skill format with `SKILL.md` frontmatter.
+---
 
-## Why Haiku for Compression?
+## Value
 
-| Model | Cost (per 1M input) | Use for |
-|-------|---------------------|---------|
-| Opus | $15.00 | Complex tasks |
-| Sonnet | $3.00 | Normal work |
-| **Haiku** | **$0.25** | Compression! |
+**For users:**
+- Agent works longer without crash
+- No constant `/new` needed
+- Complex tasks complete successfully
 
-Compressing 100K tokens with Haiku = **$0.025** (2.5 cents)
+**For agents:**
+- More operations per session
+- Full data access via cache
+- Automatic budget control
+
+**One sentence:**
+> Instead of 3 requests and crash — 10+ requests and keep working.
+
+---
 
 ## License
 
-MIT License — see [LICENSE](LICENSE)
+MIT License
 
 ## Author
 
