@@ -1,17 +1,36 @@
 ---
 name: memory-manager
-description: Real-time context monitoring with streaming compression for Clawdbot. Prevents context overflow by tracking token usage, compressing old messages proactively, and providing cost estimates. Use when managing long conversations or spawning multiple agents to avoid hitting the 200K token limit.
-metadata: {"clawdbot":{"emoji":"🧠","os":["darwin","linux"],"requires":{"bins":["python3"]}}}
+description: CRITICAL - Load this skill BEFORE spawning subagents or when context feels heavy. Prevents context overflow by tracking token usage and compressing old messages. If you see 'Context overflow' errors - you MUST use this skill immediately.
+metadata: {"clawdbot":{"emoji":"🧠","os":["darwin","linux"],"requires":{"bins":["python3"]},"priority":"high","autoLoad":true}}
 ---
 
 # Memory Manager
 
+**⚠️ CRITICAL: Use this skill BEFORE spawning any subagents!**
+
 Prevents context overflow by monitoring token usage and compressing old messages before hitting limits.
+
+## MANDATORY RULES (READ FIRST!)
+
+1. **BEFORE spawning subagents**: Check context size first!
+2. **If context > 70%**: Do NOT spawn agents. Compress first.
+3. **If you see "Context overflow"**: STOP. Start new session or compress.
+4. **Maximum subagents**: Spawn max 2 at a time, never more!
+5. **Subagent context**: Pass ONLY the task description, NOT full history!
+
+## Quick Check (Run This First!)
+
+```bash
+# Check if safe to spawn agents
+python3 {baseDir}/scripts/token_counter.py --text "$(cat current_context.txt)" --threshold 0.6
+```
+
+If exit code = 1 → **DO NOT SPAWN AGENTS!** Compress first.
 
 ## Problem Solved
 
 - Context window fills up unexpectedly → crash
-- No visibility into token usage or costs
+- No visibility into token usage or costs  
 - Spawned agents inherit full context → instant overflow
 
 ## Files
