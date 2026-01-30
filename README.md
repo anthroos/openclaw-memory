@@ -1,8 +1,14 @@
 # OpenClaw Memory Manager
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
+[![Clawdbot Skill](https://img.shields.io/badge/Clawdbot-Skill-purple.svg)](https://docs.clawd.bot/)
+
 **Real-time context monitoring with streaming compression for AI agents.**
 
-Prevents context overflow (the dreaded "prompt too large" error) by tracking token usage, compressing old messages proactively, and providing cost estimates.
+Prevents context overflow (the dreaded `Context overflow: prompt too large` error) by tracking token usage, compressing old messages proactively, and providing cost estimates.
+
+> **Warning**: If you're spawning multiple AI agents and seeing context overflow errors, this skill is for you!
 
 ## Before: The Problem
 
@@ -186,10 +192,30 @@ The skill follows the standard Clawdbot skill format with `SKILL.md` frontmatter
 
 Compressing 100K tokens with Haiku = **$0.025** (2.5 cents)
 
+## Examples
+
+See the [`examples/`](examples/) folder for:
+- `sample_history.json` — Sample conversation history for testing
+- `workflow.sh` — Complete workflow script demonstrating the check-compress-proceed pattern
+
+Run the example workflow:
+```bash
+chmod +x examples/workflow.sh
+./examples/workflow.sh examples/sample_history.json
+```
+
+## Contributing
+
+Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for version history.
+
 ## License
 
 MIT License — see [LICENSE](LICENSE)
 
 ## Author
 
-Created for the Moltbot/Clawdbot ecosystem.
+Created for the Moltbot/Clawdbot ecosystem by [@anthroos](https://github.com/anthroos).
