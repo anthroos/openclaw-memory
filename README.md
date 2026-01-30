@@ -4,28 +4,95 @@
 
 Prevents context overflow (the dreaded "prompt too large" error) by tracking token usage, compressing old messages proactively, and providing cost estimates.
 
-## The Problem
+## Before: The Problem
+
+Without memory management, AI agents hit context limits unexpectedly:
+
+```mermaid
+flowchart TD
+    subgraph before [WITHOUT Memory Manager]
+        A1[User message] --> B1[Agent responds]
+        B1 --> C1[Context grows]
+        C1 --> D1[More messages...]
+        D1 --> E1[200K tokens reached]
+        E1 --> F1[Context overflow]
+        F1 --> G1[Agent crashes]
+        G1 --> H1[State lost forever]
+    end
+    
+    style F1 fill:#ff4466,color:#fff
+    style G1 fill:#ff4466,color:#fff
+    style H1 fill:#ff4466,color:#fff
+```
+
+**Real example:** Lucy tried to spawn 3 expert agents to discuss a problem. All 3 crashed with "Context overflow: prompt too large" — while discussing how to solve context overflow. The irony!
+
+## After: The Solution
+
+With Memory Manager, context is monitored and compressed proactively:
+
+```mermaid
+flowchart TD
+    subgraph after [WITH Memory Manager]
+        A2[User message] --> B2[Check tokens]
+        B2 --> C2{Above 70%?}
+        C2 -->|No| D2[Agent responds]
+        C2 -->|Yes| E2[Compress old messages]
+        E2 --> F2[Summary + recent msgs]
+        F2 --> D2
+        D2 --> G2[Log cost]
+        G2 --> H2[Update dashboard]
+        H2 --> A2
+    end
+    
+    style E2 fill:#00ff88,color:#000
+    style F2 fill:#00ff88,color:#000
+```
+
+**Compression in action:**
 
 ```
-Lucy starts a conversation
-     ↓
-[msg1][msg2][msg3]...[msg500]  ← context grows
-     ↓
-200K tokens reached
-     ↓
-💥 Context overflow: prompt too large
-     ↓
-Agent crashes, state lost
+BEFORE: [msg1][msg2][msg3][msg4][msg5][msg6][msg7][msg8][msg9][msg10]
+              ↑_________old (7 msgs)________↑  ↑__recent (3)__↑
+                      128 tokens                   89 tokens
+                      
+AFTER:  [SUMMARY: discussed Paris, history,  ][msg8][msg9][msg10]
+         landmarks, restaurants, best time    
+                   ~30 tokens                      89 tokens
+
+SAVED: 98 tokens (76% compression ratio)
 ```
 
-## The Solution
+## Architecture
 
-```
-[msg1][msg2]...[msg7] → COMPRESS → [summary][msg8][msg9][msg10]
-     ↑                                  ↑
-  128 tokens                         30 tokens
-  
-= 76% reduction, conversation continues!
+```mermaid
+flowchart LR
+    subgraph agent [AI Agent]
+        MSG[Messages]
+    end
+    
+    subgraph memmanager [Memory Manager]
+        TC[Token Counter]
+        COMP[Compressor]
+        BT[Budget Tracker]
+    end
+    
+    subgraph storage [State]
+        STATE[state.json]
+        HIST[history.json]
+    end
+    
+    subgraph ui [Monitoring]
+        DASH[Dashboard]
+    end
+    
+    MSG --> TC
+    TC -->|above threshold| COMP
+    COMP -->|uses Haiku| COMP
+    COMP --> HIST
+    TC --> BT
+    BT --> STATE
+    STATE --> DASH
 ```
 
 ## Features
