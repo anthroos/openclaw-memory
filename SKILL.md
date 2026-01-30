@@ -48,6 +48,40 @@ DO NOT continue!
 ✅ spawn(only_task_description_under_500_tokens)
 ```
 
+### Rule 6: API calls return BIG JSON — LIMIT RESULTS
+```
+❌ moltbook_search() → returns 50+ posts → 30K tokens → OVERFLOW
+✅ moltbook_search(limit=5) → 5 posts → 2K tokens → SAFE
+
+❌ moltbook_get_comments() → all comments → 20K tokens
+✅ moltbook_get_comments(limit=3) → 3 comments → 1K tokens
+```
+
+### Rule 7: ONE TASK AT A TIME
+```
+❌ "Create post, then search, then engage 3 bots, then check reactions"
+   = 6+ tool calls = OVERFLOW
+
+✅ "Create post" → STOP → wait for user
+✅ "Search for 3 bots" → STOP → wait for user  
+✅ "Engage 1 bot" → STOP → wait for user
+```
+
+### Rule 8: NO CHAIN REACTIONS
+```
+❌ Tool call → see result → "let me also..." → another tool → "and also..."
+   This KILLS context!
+
+✅ Tool call → DONE. Report to user. Wait.
+```
+
+### Rule 9: YOUR ESTIMATES ARE WRONG
+```
+Your "49% context" is probably actually 80%+
+Tool outputs are BIGGER than you think
+When in doubt: STOP EARLIER, not later
+```
+
 ---
 
 ## 📋 PRE-ACTION CHECKLIST (Run mentally before EVERY action)
@@ -138,11 +172,37 @@ Spawning subagent?
 ❌ "I'll read the entire file..." → cat → 30K tokens → OVERFLOW
 ❌ "Here's a detailed explanation..." → 5K response → OVERFLOW
 ❌ "Spawning 5 expert agents..." → 5x context → OVERFLOW
+❌ "Let me also engage these 3 bots..." → chain reaction → OVERFLOW
+❌ "Checking reactions on my post..." → unnecessary call → OVERFLOW
 
 ✅ "Using smart_fetch..." → 2K summary → SAFE
 ✅ "Reading signatures only..." → 500 tokens → SAFE
 ✅ "Short answer: X" → 200 tokens → SAFE
 ✅ "Spawning 1 focused agent..." → minimal context → SAFE
+✅ "Done. One post created." → STOP → SAFE
+```
+
+---
+
+## 🤖 MOLTBOOK/API SPECIFIC RULES
+
+```
+⚠️ EVERY API call returns JSON = TOKENS!
+
+moltbook_create_post    → ~500 tokens (OK)
+moltbook_search         → ~5K-30K tokens (DANGER!)
+moltbook_get_feed       → ~10K-50K tokens (DANGER!)
+moltbook_get_comments   → ~2K-20K tokens (DANGER!)
+
+ALWAYS use limit parameter:
+- search(limit=5) not search()
+- get_feed(limit=3) not get_feed()
+- get_comments(limit=3) not get_comments()
+
+RESIST THE URGE to:
+- "Check how my post is doing" → unnecessary
+- "Engage multiple bots at once" → do ONE
+- "Search for more content" → you have enough
 ```
 
 ---
