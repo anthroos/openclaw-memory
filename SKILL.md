@@ -57,29 +57,48 @@ DO NOT continue!
 ✅ moltbook_get_comments(limit=3) → 3 comments → 1K tokens
 ```
 
-### Rule 7: ONE TASK AT A TIME
+### Rule 7: USE SMART TOOLS FOR EVERYTHING
 ```
-❌ "Create post, then search, then engage 3 bots, then check reactions"
-   = 6+ tool calls = OVERFLOW
+BEFORE any external data operation:
+1. Check current context %
+2. Use smart_fetch / smart_read (NOT native tools)
+3. They auto-adjust output based on your budget
 
-✅ "Create post" → STOP → wait for user
-✅ "Search for 3 bots" → STOP → wait for user  
-✅ "Engage 1 bot" → STOP → wait for user
-```
-
-### Rule 8: NO CHAIN REACTIONS
-```
-❌ Tool call → see result → "let me also..." → another tool → "and also..."
-   This KILLS context!
-
-✅ Tool call → DONE. Report to user. Wait.
+smart_fetch at 30% context → returns 10K max
+smart_fetch at 70% context → returns 2K max (auto!)
 ```
 
-### Rule 9: YOUR ESTIMATES ARE WRONG
+### Rule 8: LIMIT ALL API RESPONSES
 ```
-Your "49% context" is probably actually 80%+
-Tool outputs are BIGGER than you think
-When in doubt: STOP EARLIER, not later
+EVERY API call must have limits:
+
+❌ search() → unknown size → potential overflow
+✅ search(limit=5) → controlled size → safe
+
+❌ get_feed() → 50 posts → 30K tokens
+✅ get_feed(limit=3) → 3 posts → 2K tokens
+
+NO EXCEPTIONS. Always pass limit parameter.
+```
+
+### Rule 9: SELF-MONITOR CONTINUOUSLY
+```
+After every 3 tool calls:
+→ Estimate current context %
+→ If > 60%: switch to minimal outputs
+→ If > 80%: finish current task, no new tasks
+
+You can keep working, just be economical.
+```
+
+### Rule 10: CACHE IS YOUR FRIEND
+```
+Got summary but need details later?
+→ Full content is cached
+→ Use: cache_manager --get ID --section "specific part"
+→ Gets only what you need (500 tokens vs 50K)
+
+This lets you work autonomously without overflow.
 ```
 
 ---
@@ -148,38 +167,46 @@ python3 {baseDir}/scripts/compressor.py --input history.json --keep-recent 5
 
 ```
 Need external data?
-├── URL → smart_fetch.py (NOT web_fetch!)
-├── File → smart_read.py (NOT cat/read!)
-└── API → smart_fetch.py with API URL
+├── URL → smart_fetch.py (auto-limits based on context!)
+├── File → smart_read.py (auto-limits based on context!)
+└── API → ALWAYS pass limit parameter
 
-Context feeling heavy?
-├── < 50% → Continue carefully
-├── 50-70% → Switch to survival mode
-└── > 70% → STOP, tell user to /new
+Context estimate?
+├── < 50% → Full speed, smart tools handle it
+├── 50-70% → Continue, tools auto-switch to minimal
+├── 70-85% → Finish current task, then suggest /new
+└── > 85% → Complete only current action, then /new
 
 Spawning subagent?
-├── Context > 50%? → NO, don't spawn
-├── Task description > 500 tokens? → Shorten it
-└── More than 2 agents? → NO, max 2
+├── Context > 60%? → NO, do it yourself
+├── Context < 60%? → OK, max 2, minimal task description
+└── Task description > 500 tokens? → Shorten it
+
+Multiple tasks queued?
+├── Context < 50% → Do them all
+├── Context 50-70% → Do 2-3 more, then assess
+└── Context > 70% → Do 1 more, then /new
 ```
 
 ---
 
-## 🚫 BANNED PATTERNS
+## 🚫 BANNED vs ✅ ALLOWED
 
 ```
-❌ "Let me fetch this URL..." → web_fetch → 50K tokens → OVERFLOW
-❌ "I'll read the entire file..." → cat → 30K tokens → OVERFLOW
-❌ "Here's a detailed explanation..." → 5K response → OVERFLOW
-❌ "Spawning 5 expert agents..." → 5x context → OVERFLOW
-❌ "Let me also engage these 3 bots..." → chain reaction → OVERFLOW
-❌ "Checking reactions on my post..." → unnecessary call → OVERFLOW
+❌ web_fetch(url) → uncontrolled 50K → OVERFLOW
+✅ smart_fetch(url) → auto-limited 2-10K → SAFE
 
-✅ "Using smart_fetch..." → 2K summary → SAFE
-✅ "Reading signatures only..." → 500 tokens → SAFE
-✅ "Short answer: X" → 200 tokens → SAFE
-✅ "Spawning 1 focused agent..." → minimal context → SAFE
-✅ "Done. One post created." → STOP → SAFE
+❌ cat large_file → uncontrolled 30K → OVERFLOW  
+✅ smart_read(file) → auto-limited → SAFE
+
+❌ search() without limit → 30K → OVERFLOW
+✅ search(limit=5) → controlled 2K → SAFE
+
+❌ spawn 5 agents with full context → 5x memory → OVERFLOW
+✅ spawn 1-2 agents with task-only context → SAFE
+
+❌ Keep working at 85% context → next call = crash
+✅ At 80%+: finish task, start fresh session for new tasks
 ```
 
 ---
@@ -189,20 +216,24 @@ Spawning subagent?
 ```
 ⚠️ EVERY API call returns JSON = TOKENS!
 
-moltbook_create_post    → ~500 tokens (OK)
-moltbook_search         → ~5K-30K tokens (DANGER!)
-moltbook_get_feed       → ~10K-50K tokens (DANGER!)
-moltbook_get_comments   → ~2K-20K tokens (DANGER!)
+SAFE calls (~500 tokens):
+- moltbook_create_post
+- moltbook_like_post  
+- moltbook_comment (short)
 
-ALWAYS use limit parameter:
-- search(limit=5) not search()
-- get_feed(limit=3) not get_feed()
-- get_comments(limit=3) not get_comments()
+DANGEROUS calls (use limits!):
+- moltbook_search(limit=5)      → ~2K tokens ✅
+- moltbook_search()             → ~30K tokens ❌
+- moltbook_get_feed(limit=3)    → ~2K tokens ✅
+- moltbook_get_feed()           → ~50K tokens ❌
 
-RESIST THE URGE to:
-- "Check how my post is doing" → unnecessary
-- "Engage multiple bots at once" → do ONE
-- "Search for more content" → you have enough
+AUTONOMOUS WORKFLOW:
+1. Do task (post, search, engage)
+2. Check context estimate
+3. If < 70%: continue to next task
+4. If > 70%: finish current, suggest /new for more
+
+You stay autonomous, just manage your budget.
 ```
 
 ---
